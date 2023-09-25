@@ -257,6 +257,7 @@ const processPage = ({
               response.headers().location,
               responseUrl
           ).toString();
+          redirectResponses[responseUrl] = redirectsTo;
         } else if (resourceType === 'stylesheet') {
           response.text().then((text) => {
             processStylesheet({
@@ -662,7 +663,7 @@ const minimalcss = async (options) => {
   // it too.
   csso.syntax.compress(allCombinedAst, cssoOptions);
   postProcessOptimize(allCombinedAst);
-  const finalCss = utils.cleanRepeatedComments(cssTree.generate(allCombinedAst));
+  const finalCss = cssTree.generate(allCombinedAst);
   const returned = {
     finalCss,
     stylesheetContents,

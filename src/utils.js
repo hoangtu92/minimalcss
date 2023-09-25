@@ -1,4 +1,3 @@
-// @ts-ignore
 const csstree = require('css-tree');
 
 /**
@@ -6,13 +5,13 @@ const csstree = require('css-tree');
  * only argument is a hashable. E.g. a string.
  */
 function memoize(fn) {
-    const cache = {};
-    return (argument) => {
-        if (!(argument in cache)) {
-            cache[argument] = fn(argument);
-        }
-        return cache[argument];
-    };
+  const cache = {};
+  return (argument) => {
+    if (!(argument in cache)) {
+      cache[argument] = fn(argument);
+    }
+    return cache[argument];
+  };
 }
 
 /**
@@ -78,26 +77,8 @@ function getParentSelectors(selector) {
     return parentSelectors.reverse();
 }
 
-
-/* Replace repeated important comments and leave the first behind.
-This is useful when you have concatenated multiple pages' CSS and they
-each have a licence comment, for example, in the beginning. In that
-case we only want to keep the first of each.
-*/
-const cleanRepeatedComments = css => {
-    const once = {}
-    return css.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, match => {
-        if (once[match]) {
-            return ''
-        }
-        once[match] = true
-        return match
-    })
-}
-
 module.exports = {
-    reduceCSSSelector,
-    unquoteString,
-    getParentSelectors,
-    cleanRepeatedComments
+  reduceCSSSelector,
+  unquoteString,
+  getParentSelectors,
 };
