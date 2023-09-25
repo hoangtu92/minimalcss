@@ -1,10 +1,8 @@
 'use strict';
 
 const puppeteer = require('puppeteer');
-// @ts-ignore
 const csso = require('csso');
-// @ts-ignore
-const csstree = require('css-tree');
+const cssTree = require('css-tree');
 const cheerio = require('cheerio');
 const utils = require('./utils');
 const { createTracker } = require('./tracker');
@@ -13,7 +11,7 @@ const url = require('url');
 const isOk = (response) => response.ok() || response.status() === 304;
 
 /**
- * Take in a csstree AST, mutate it and return a csstree AST.
+ * Take in a cssTree AST, mutate it and return a cssTree AST.
  * The mutation is about:
  *
  *   1) Remove all keyframe declarations that are *not* mentioned
@@ -25,7 +23,7 @@ const isOk = (response) => response.ok() || response.status() === 304;
  * that track the names of all animations and font families. Then,
  * it converts the AST to a plain object, which it mutates by filtering
  * the 'children' object.
- * Lastly it uses the csstree's fromPlainObject to return the plain
+ * Lastly it uses the cssTree's fromPlainObject to return the plain
  * object back as an AST.
  * @param {Object} ast
  * @return Object
@@ -34,24 +32,24 @@ const postProcessOptimize = (ast) => {
   // First walk the AST to know which animations are ever mentioned
   // by the remaining rules.
   const activeAnimationNames = new Set(
-    csstree.lexer
+    cssTree.lexer
       .findAllFragments(ast, 'Type', 'keyframes-name')
-      .map((entry) => csstree.generate(entry.nodes.first()))
+      .map((entry) => cssTree.generate(entry.nodes.first()))
   );
 
   // This is the function we use to filter @keyframes atrules out,
   // if its name is not actively used.
   // It also filters out all `@media print` atrules.
-  csstree.walk(ast, {
+  cssTree.walk(ast, {
     visit: 'Atrule',
     enter: (node, item, list) => {
-      const basename = csstree.keyword(node.name).basename;
+      const basename = cssTree.keyword(node.name).basename;
       if (basename === 'keyframes') {
-        if (!activeAnimationNames.has(csstree.generate(node.prelude))) {
+        if (!activeAnimationNames.has(cssTree.generate(node.prelude))) {
           list.remove(item);
         }
       } else if (basename === 'media') {
-        if (csstree.generate(node.prelude) === 'print') {
+        if (cssTree.generate(node.prelude) === 'print') {
           list.remove(item);
         }
       }
@@ -60,18 +58,18 @@ const postProcessOptimize = (ast) => {
 
   // Now figure out what font-families are at all used in the AST.
   const activeFontFamilyNames = new Set();
-  csstree.walk(ast, {
+  cssTree.walk(ast, {
     visit: 'Declaration',
     enter: function (node) {
-      // walker pass through `font-family` declarations inside @font-face too
+      // walker pass through `font-family` declarations inside @font-face too.
       // this condition filter them, to walk through declarations
       // inside a rules only.
       if (this.rule) {
-        csstree.lexer
+        cssTree.lexer
           .findDeclarationValueFragments(node, 'Type', 'family-name')
           .forEach((entry) => {
             const name = utils.unquoteString(
-              csstree.generate({
+              cssTree.generate({
                 type: 'Value',
                 children: entry.nodes,
               })
@@ -83,17 +81,17 @@ const postProcessOptimize = (ast) => {
   });
 
   // Walk into every font-family rule and inspect if we uses its declarations
-  csstree.walk(ast, {
+  cssTree.walk(ast, {
     visit: 'Atrule',
     enter: (atrule, atruleItem, atruleList) => {
-      if (csstree.keyword(atrule.name).basename === 'font-face') {
+      if (cssTree.keyword(atrule.name).basename === 'font-face') {
         // We're inside a font-face rule! Let's dig deeper.
-        csstree.walk(atrule, {
+        cssTree.walk(atrule, {
           visit: 'Declaration',
           enter: (declaration) => {
-            if (csstree.property(declaration.property).name === 'font-family') {
+            if (cssTree.property(declaration.property).name === 'font-family') {
               const name = utils.unquoteString(
-                csstree.generate(declaration.value)
+                cssTree.generate(declaration.value)
               );
               // was this @font-face used?
               if (!activeFontFamilyNames.has(name)) {
@@ -114,8 +112,8 @@ const processStylesheet = ({
   stylesheetAsts,
   stylesheetContents,
 }) => {
-  const ast = csstree.parse(text);
-  csstree.walk(ast, (node) => {
+  const ast = cssTree.parse(text);
+  cssTree.walk(ast, (node) => {
     if (node.type !== 'Url') return;
     const value = node.value;
     let path = value.value;
@@ -255,11 +253,10 @@ const processPage = ({
           // If the 'Location' header points to a relative URL,
           // convert it to an absolute URL.
           // If it already was an absolute URL, it stays like that.
-          const redirectsTo = new url.URL(
-            response.headers().location,
-            responseUrl
+          redirectResponses[responseUrl] = new url.URL(
+              response.headers().location,
+              responseUrl
           ).toString();
-          redirectResponses[responseUrl] = redirectsTo;
         } else if (resourceType === 'stylesheet') {
           response.text().then((text) => {
             processStylesheet({
@@ -476,7 +473,7 @@ const minimalcss = async (options) => {
   } finally {
     // We can close the browser now that all URLs have been opened.
     if (!options.browser) {
-      browser.close();
+      await browser.close();
     }
   }
 
@@ -541,12 +538,12 @@ const minimalcss = async (options) => {
       return;
     }
     const ast = stylesheetAsts[href];
-    csstree.walk(ast, {
+    cssTree.walk(ast, {
       visit: 'Rule',
       enter: function (node, item, list) {
         if (
           this.atrule &&
-          csstree.keyword(this.atrule.name).basename === 'keyframes'
+          cssTree.keyword(this.atrule.name).basename === 'keyframes'
         ) {
           // Don't bother inspecting rules that are inside a keyframe.
           return;
@@ -565,7 +562,7 @@ const minimalcss = async (options) => {
             // Translate selector's AST to a string and filter pseudos from it
             // This changes things like `a.button:active` to `a.button`
             const selectorString = utils.reduceCSSSelector(
-              csstree.generate(node)
+              cssTree.generate(node)
             );
 
             // Before we begin, do a little warmup of the decision cache.
@@ -584,7 +581,7 @@ const minimalcss = async (options) => {
             parentSelectors.forEach((selectorParentString) => {
               if (bother) {
                 // Is it NOT in the decision cache?
-                if (selectorParentString in decisionsCache === false) {
+                if (!(selectorParentString in decisionsCache)) {
                   decisionsCache[
                     selectorParentString
                   ] = isSelectorMatchToAnyElement(selectorParentString);
@@ -601,7 +598,7 @@ const minimalcss = async (options) => {
               }
             });
 
-            if (selectorString in decisionsCache === false) {
+            if (!(selectorString in decisionsCache)) {
               decisionsCache[selectorString] = isSelectorMatchToAnyElement(
                 selectorString
               );
@@ -640,13 +637,13 @@ const minimalcss = async (options) => {
     loc: null,
     children: allUsedHrefs.reduce(
       (children, href) => children.appendList(stylesheetAsts[href].children),
-      new csstree.List()
+      new cssTree.List()
     ),
   };
 
   // Lift important comments (i.e. /*! comment */) up to the beginning
-  const comments = new csstree.List();
-  csstree.walk(allCombinedAst, {
+  const comments = new cssTree.List();
+  cssTree.walk(allCombinedAst, {
     visit: 'Comment',
     enter: (_node, item, list) => {
       comments.append(list.remove(item));
@@ -665,7 +662,7 @@ const minimalcss = async (options) => {
   // it too.
   csso.syntax.compress(allCombinedAst, cssoOptions);
   postProcessOptimize(allCombinedAst);
-  const finalCss = csstree.generate(allCombinedAst);
+  const finalCss = utils.cleanRepeatedComments(cssTree.generate(allCombinedAst));
   const returned = {
     finalCss,
     stylesheetContents,

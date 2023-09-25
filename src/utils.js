@@ -1,3 +1,4 @@
+// @ts-ignore
 const csstree = require('css-tree');
 
 /**
@@ -5,13 +6,13 @@ const csstree = require('css-tree');
  * only argument is a hashable. E.g. a string.
  */
 function memoize(fn) {
-  const cache = {};
-  return (argument) => {
-    if (argument in cache === false) {
-      cache[argument] = fn(argument);
-    }
-    return cache[argument];
-  };
+    const cache = {};
+    return (argument) => {
+        if (!(argument in cache)) {
+            cache[argument] = fn(argument);
+        }
+        return cache[argument];
+    };
 }
 
 /**
@@ -27,10 +28,10 @@ function memoize(fn) {
  * @return {string}
  */
 const reduceCSSSelector = memoize((selector) => {
-  selector = selector.replace('\\:', '_ESCAPED_COLON_');
-  return selector
-    .split(/:(?=([^"'\\]*(\\.|["']([^"'\\]*\\.)*[^"'\\]*['"]))*[^"']*$)/g)[0]
-    .replace('_ESCAPED_COLON_', '\\:');
+    selector = selector.replace('\\:', '_ESCAPED_COLON_');
+    return selector
+        .split(/:(?=([^"'\\]*(\\.|["']([^"'\\]*\\.)*[^"'\\]*['"]))*[^"']*$)/g)[0]
+        .replace('_ESCAPED_COLON_', '\\:');
 });
 
 /**
@@ -39,12 +40,12 @@ const reduceCSSSelector = memoize((selector) => {
  * @return {string}
  */
 const unquoteString = memoize((string) => {
-  const first = string.charAt(0);
-  const last = string.charAt(string.length - 1);
-  if (first === last && (first === '"' || first === "'")) {
-    return string.substring(1, string.length - 1);
-  }
-  return string;
+    const first = string.charAt(0);
+    const last = string.charAt(string.length - 1);
+    if (first === last && (first === '"' || first === "'")) {
+        return string.substring(1, string.length - 1);
+    }
+    return string;
 });
 
 /**
@@ -56,29 +57,47 @@ const unquoteString = memoize((string) => {
  * @return {string[]}
  */
 function getParentSelectors(selector) {
-  if (!selector) return [];
-  const parentSelectors = [];
-  const selectorAst = csstree.parse(selector, { context: 'selector' });
+    if (!selector) return [];
+    const parentSelectors = [];
+    const selectorAst = csstree.parse(selector, {context: 'selector'});
 
-  let generatedCSS;
-  while (selectorAst.children.tail) {
-    selectorAst.children.prevUntil(
-      selectorAst.children.tail,
-      (node, item, list) => {
-        list.remove(item);
-        return node.type === 'Combinator' || node.type === 'WhiteSpace';
-      }
-    );
-    generatedCSS = csstree.generate(selectorAst);
-    if (generatedCSS) {
-      parentSelectors.push(generatedCSS);
+    let generatedCSS;
+    while (selectorAst.children.tail) {
+        selectorAst.children.prevUntil(
+            selectorAst.children.tail,
+            (node, item, list) => {
+                list.remove(item);
+                return node.type === 'Combinator' || node.type === 'WhiteSpace';
+            }
+        );
+        generatedCSS = csstree.generate(selectorAst);
+        if (generatedCSS) {
+            parentSelectors.push(generatedCSS);
+        }
     }
-  }
-  return parentSelectors.reverse();
+    return parentSelectors.reverse();
+}
+
+
+/* Replace repeated important comments and leave the first behind.
+This is useful when you have concatenated multiple pages' CSS and they
+each have a licence comment, for example, in the beginning. In that
+case we only want to keep the first of each.
+*/
+const cleanRepeatedComments = css => {
+    const once = {}
+    return css.replace(/\/\*\![\s\S]*?\*\/\n*/gm, match => {
+        if (once[match]) {
+            return ''
+        }
+        once[match] = true
+        return match
+    })
 }
 
 module.exports = {
-  reduceCSSSelector,
-  unquoteString,
-  getParentSelectors,
+    reduceCSSSelector,
+    unquoteString,
+    getParentSelectors,
+    cleanRepeatedComments
 };
