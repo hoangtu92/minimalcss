@@ -86,7 +86,7 @@ case we only want to keep the first of each.
 */
 const cleanRepeatedComments = css => {
     const once = {}
-    return css.replace(/\/\*\![\s\S]*?\*\/\n*/gm, match => {
+    return css.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, match => {
         if (once[match]) {
             return ''
         }
