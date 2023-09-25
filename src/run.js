@@ -34,7 +34,7 @@ const postProcessOptimize = (ast) => {
   const activeAnimationNames = new Set(
     cssTree.lexer
       .findAllFragments(ast, 'Type', 'keyframes-name')
-      .map((entry) => cssTree.generate(entry.nodes.first()))
+      .map((entry) => cssTree.generate(entry.nodes.first))
   );
 
   // This is the function we use to filter @keyframes atrules out,
@@ -115,27 +115,17 @@ const processStylesheet = ({
   const ast = cssTree.parse(text);
   cssTree.walk(ast, (node) => {
     if (node.type !== 'Url') return;
-    const value = node.value;
-    let path = value.value;
-    if (value.type !== 'Raw') {
-      path = path.substr(1, path.length - 2);
-    }
     const sameHost = url.parse(responseUrl).host === url.parse(pageUrl).host;
-    if (/^https?:\/\/|^\/\/|^data:/i.test(path)) {
+    if (/^https?:\/\/|^\/\/|^data:/i.test(node.value)) {
       // do nothing
-    } else if (/^\//.test(path) && sameHost) {
+    } else if (/^\//.test(node.value) && sameHost) {
       // do nothing
     } else {
-      const resolved = new url.URL(path, responseUrl);
+      const resolved = new url.URL(node.value, responseUrl);
       if (sameHost) {
-        path = resolved.pathname + resolved.search;
+        node.value = resolved.pathname + resolved.search;
       } else {
-        path = resolved.href;
-      }
-      if (value.type !== 'Raw') {
-        value.value = `"${path}"`;
-      } else {
-        value.value = path;
+        node.value = resolved.href;
       }
     }
   });
@@ -610,7 +600,7 @@ const minimalcss = async (options) => {
             }
           });
 
-          if (node.prelude.children.isEmpty()) {
+          if (node.prelude.children.isEmpty) {
             // delete rule from a list
             list.remove(item);
           }
